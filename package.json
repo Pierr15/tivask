@@ -1,0 +1,35 @@
+{
+  "name": "tivask",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "dashboard"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n API,UI -c cyan,magenta \"npm run dev -w backend\" \"npm run dev -w dashboard\"",
+    "build": "npm run build -w backend && npm run build -w dashboard",
+    "check": "npm run check -w backend && npm run check -w dashboard",
+    "test": "npm run test -w backend",
+    "setup": "node scripts/setup.mjs",
+    "db:generate": "npm run db:generate -w backend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:seed": "npm run db:seed -w backend",
+    "db:vector": "npm run db:vector -w backend",
+    "start": "npm run start -w backend"
+  },
+  "devDependencies": {
+    "@puppeteer/browsers": "3.2.2",
+    "concurrently": "^9.2.1",
+    "deepmerge-ts": "8.0.2",
+    "effect": "3.22.1"
+  },
+  "overrides": {
+    "@puppeteer/browsers": "3.2.2",
+    "deepmerge-ts": "8.0.2",
+    "effect": "3.22.1"
+  }
+}

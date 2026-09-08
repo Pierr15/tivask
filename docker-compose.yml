@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: tivask
+      POSTGRES_USER: tivask
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in root .env}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - tivask_pgdata:/var/lib/postgresql
+    shm_size: 128mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tivask -d tivask"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+volumes:
+  tivask_pgdata:
+

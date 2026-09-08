@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+.wwebjs_auth/
+.wwebjs_cache/
+backend/data/uploads/*
+backend/data/fallback/*
+!**/.gitkeep
+backend/data/knowledge-cache.json
+logs/
+*.log
+work/
+*.tsbuildinfo
+

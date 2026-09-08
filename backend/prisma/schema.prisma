@@ -1,0 +1,196 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum KnowledgeCategory {
+  SCHOOL
+  DEPARTMENT
+  PATH
+  REQUIREMENT
+  SCHEDULE
+  COST
+  FAQ
+  CONTACT
+  PROGRAM
+  CUSTOM
+}
+enum MessageRole {
+  USER
+  ASSISTANT
+  ADMIN
+}
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+enum DocumentStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+model KnowledgeEntity {
+  id String @id @default(uuid())
+  category KnowledgeCategory
+  title String
+  content String
+  keywords String[]
+  verified Boolean @default(false)
+  demo Boolean @default(false)
+  details Json @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  school SchoolInfo?
+  department Department?
+  path AdmissionPath?
+  requirement Requirement?
+  schedule AdmissionSchedule?
+  cost CostInfo?
+  faq FAQ?
+  @@index([category, verified])
+}
+model SchoolInfo {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  academicYear String?
+}
+model Department {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  quota Int?
+}
+model AdmissionPath {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  quota Int?
+}
+model Requirement {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  mandatory Boolean @default(true)
+}
+model AdmissionSchedule {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  startsAt DateTime?
+  endsAt DateTime?
+}
+model CostInfo {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  amount Decimal? @db.Decimal(14, 2)
+  gender String?
+}
+model FAQ {
+  id String @id @default(uuid())
+  entityId String @unique
+  entity KnowledgeEntity @relation(fields: [entityId], references: [id], onDelete: Cascade)
+  question String?
+}
+model Document {
+  id String @id @default(uuid())
+  filename String
+  storageName String
+  mimeType String
+  status DocumentStatus @default(PENDING)
+  verified Boolean @default(false)
+  demo Boolean @default(false)
+  error String?
+  indexMode String?
+  uploadedAt DateTime @default(now())
+  indexedAt DateTime?
+  chunks DocumentChunk[]
+}
+model DocumentChunk {
+  id String @id @default(uuid())
+  documentId String
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  filename String
+  page Int?
+  chunkIndex Int
+  text String
+  tokenCount Int
+  embedding Json?
+  embeddingModel String?
+  createdAt DateTime @default(now())
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+}
+model Conversation {
+  id String @id
+  whatsappId String @unique
+  channel String @default("WHATSAPP")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages Message[]
+  tickets Ticket[]
+}
+model Message {
+  id String @id
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role MessageRole
+  content String
+  route String?
+  topic String?
+  delivery String @default("STORED")
+  externalId String? @unique
+  createdAt DateTime @default(now())
+  @@index([conversationId, createdAt])
+}
+model Ticket {
+  id String @id
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  whatsappNumber String
+  name String?
+  question String
+  summary String
+  summarySource String @default("LOCAL")
+  reason String
+  priority Priority @default(NORMAL)
+  status TicketStatus @default(OPEN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  resolvedAt DateTime?
+  @@index([status, priority, createdAt])
+  @@index([conversationId])
+}
+model AnalyticsEvent {
+  id String @id
+  type String
+  topic String?
+  channel String?
+  latencyMs Int?
+  demo Boolean @default(false)
+  createdAt DateTime @default(now())
+  @@index([createdAt, type])
+}
+model SystemSetting {
+  key String @id
+  value Json
+  updatedAt DateTime @updatedAt
+}
+model DeliveryReceipt {
+  id String @id
+  status String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

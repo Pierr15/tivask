@@ -1,0 +1,9 @@
+import type {ReactNode} from 'react';import {X,LoaderCircle,Inbox,AlertCircle} from 'lucide-react';
+export function Badge({value}:{value:string}){const good=['ONLINE','CONNECTED','READY','INDEXED','SENT','RESOLVED','POSTGRESQL'];const bad=['OFFLINE','ERROR','FAILED','UNAVAILABLE','UNCERTAIN'];return <span className={'badge '+(good.includes(value)?'good':bad.includes(value)?'bad':'neutral')}><i/>{value.replaceAll('_',' ')}</span>;}
+export function Empty({title,children}:{title:string;children?:ReactNode}){return <div className="empty"><div className="empty-icon"><Inbox size={25}/></div><h3>{title}</h3><p>{children}</p></div>;}
+export function Loading(){return <div className="loading"><LoaderCircle className="spin" size={22}/>Memuat data…</div>;}
+export function ErrorBox({message}:{message:string}){return message?<div className="error-box" role="alert"><AlertCircle size={18}/>{message}</div>:null;}
+export function Modal({title,onClose,children,wide=false}:{title:string;onClose:()=>void;children:ReactNode;wide?:boolean}){return <div className="modal-backdrop" onClick={onClose}><section role="dialog" aria-modal="true" aria-label={title} className={'modal '+(wide?'wide':'')} onClick={e=>e.stopPropagation()}><div className="modal-head"><h2>{title}</h2><button className="icon-btn" aria-label="Tutup" onClick={onClose}><X size={20}/></button></div>{children}</section></div>;}
+export function PageHead({eyebrow,title,description,children}:{eyebrow:string;title:string;description:string;children?:ReactNode}){return <div className="page-head"><div><div className="eyebrow">{eyebrow}</div><h1>{title}</h1><p>{description}</p></div><div className="head-actions">{children}</div></div>;}
+export const date=(s:string)=>new Date(s).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'});
+

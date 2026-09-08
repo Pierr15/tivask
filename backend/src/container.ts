@@ -1,0 +1,25 @@
+import { Persistence } from './modules/conversation/Persistence.js';
+import { StructuredKnowledgeService } from './modules/knowledge/StructuredKnowledgeService.js';
+import { EmbeddingService } from './modules/rag/EmbeddingService.js';
+import { VectorRepository } from './modules/rag/VectorRepository.js';
+import { RetrievalService } from './modules/rag/RetrievalService.js';
+import { GeminiProvider } from './modules/ai/GeminiProvider.js';
+import { AIService } from './modules/ai/AIService.js';
+import { TicketService } from './modules/tickets/TicketService.js';
+import { ConversationService } from './modules/conversation/ConversationService.js';
+import { WhatsAppProvider } from './modules/whatsapp/WhatsAppProvider.js';
+import { DocumentService } from './modules/rag/DocumentService.js';
+import { AnalyticsService } from './modules/analytics/AnalyticsService.js';
+export const persistence=new Persistence();
+export const knowledge=new StructuredKnowledgeService();
+export const embedding=new EmbeddingService();
+export const vectors=new VectorRepository();
+export const retrieval=new RetrievalService(embedding,vectors);
+export const gemini=new GeminiProvider();
+export const tickets=new TicketService(persistence);
+export const ai=new AIService(knowledge,retrieval,gemini);
+export const conversations=new ConversationService(persistence,ai,tickets);
+export const whatsapp=new WhatsAppProvider(conversations);
+export const documents=new DocumentService(embedding,vectors,persistence);
+export const analytics=new AnalyticsService();
+

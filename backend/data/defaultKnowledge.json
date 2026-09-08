@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "school-identity",
+      "category": "SCHOOL",
+      "title": "Identitas sekolah",
+      "content": "Nama sekolah: SMK Negeri 1 Adiwerna. Tahun ajaran: 2026/2027.",
+      "keywords": [
+        "profil",
+        "sekolah",
+        "nama sekolah",
+        "tahun ajaran"
+      ],
+      "verified": true,
+      "demo": false,
+      "details": {}
+    }
+  ]
+}
