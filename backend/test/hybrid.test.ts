@@ -4,7 +4,9 @@ import { IntentRouter } from '../src/modules/ai/IntentRouter.js';
 import { LocalSemanticEngine } from '../src/modules/ai/LocalSemanticEngine.js';
 import { GroundingValidator,type Evidence } from '../src/modules/ai/GroundingValidator.js';
 import { lexicalScore,supportsQuery } from '../src/modules/ai/QuerySignals.js';
-import { fuseHybridEvidence } from '../src/modules/rag/RetrievalService.js';
+import { fuseHybridEvidence,mergeContextTexts } from '../src/modules/rag/RetrievalService.js';
+import { ChunkService } from '../src/modules/rag/ChunkService.js';
+import { htmlToStructuredText } from '../src/modules/rag/DocumentService.js';
 import type { KnowledgeItem } from '../src/modules/knowledge/types.js';
 
 test('lexical relevance distinguishes the requested cost item',()=>{
@@ -58,4 +60,28 @@ test('verified FAQ can be selected before document RAG',()=>{
  const result=new LocalSemanticEngine().selectFaq(intent,items);
  assert.equal(result[0]?.id,'faq-free');
  assert.equal(result.some(i=>i.id==='faq-uniform'),false);
+});
+
+test('semantic chunking keeps short facts intact instead of cutting by character count',()=>{
+ const text='## Biaya Seragam\n\nBiaya seragam perempuan adalah Rp275.000.\n\n## Jadwal\n\nPendaftaran dibuka pada 10 Juni 2026.';
+ const chunks=new ChunkService().split([{page:2,text}],80,20);
+ assert.ok(chunks.length>=2);
+ assert.ok(chunks.every(c=>c.page===2&&c.text.length<=80));
+ assert.ok(chunks.some(c=>c.text.includes('Biaya seragam perempuan adalah Rp275.000.')));
+ assert.ok(chunks.some(c=>c.text.includes('Pendaftaran dibuka pada 10 Juni 2026.')));
+});
+
+test('DOCX html conversion retains headings and table row relationships',()=>{
+ const html='<h2>Biaya Seragam</h2><table><tr><td>Perempuan</td><td>Rp275.000</td></tr><tr><td>Laki-laki</td><td>Rp250.000</td></tr></table>';
+ const text=htmlToStructuredText(html);
+ assert.match(text,/## Biaya Seragam/);
+ assert.match(text,/Perempuan \| Rp275\.000/);
+ assert.match(text,/Laki-laki \| Rp250\.000/);
+});
+
+test('adjacent chunk reconstruction removes overlap while restoring a split fact',()=>{
+ const phrase='Biaya seragam peserta didik perempuan';
+ const merged=mergeContextTexts([`Rincian biaya. ${phrase}`,`${phrase} adalah Rp275.000 dan dibayar saat daftar ulang.`]);
+ assert.match(merged,/Biaya seragam peserta didik perempuan adalah Rp275\.000/);
+ assert.equal(merged.split(phrase).length-1,1);
 });
