@@ -52,7 +52,7 @@ export function lexicalScore(query:string,text:string){
  let base:number;
  if(specific.length)base=.35*coverage+.5*specificCoverage+.15*bigramCoverage;
  else base=.75*coverage+.25*bigramCoverage;
- const genderBonus=requestedGender(query)?.05:0;
+ const genderBonus=requestedGender(query)?0.05:0;
  return Math.max(0,Math.min(1,base+genderBonus));
 }
 
