@@ -49,6 +49,7 @@ router.get('/tickets/:id',async(req,res)=>{
  reply(res,{ticket,messages});
 });
 router.post('/tickets/:id/read',async(req,res)=>reply(res,await tickets.markRead(id(req.params.id))));
+router.post('/tickets/:id/assign',async(req,res)=>{const ticket=await tickets.find(id(req.params.id));reply(res,await tickets.update(ticket.id,{assignedTo:env.ADMIN_USERNAME,...(ticket.status==='OPEN'?{status:'ASSIGNED' as const}:{})}));});
 router.patch('/tickets/:id',async(req,res)=>{
  const v=z.object({
  status:z.enum(['OPEN','ASSIGNED','IN_PROGRESS','WAITING_USER','RESOLVED','CLOSED']).optional(),
