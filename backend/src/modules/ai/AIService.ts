@@ -27,7 +27,6 @@ export class AIService{
  if(quotes?.length)return {...base,route:'RAG',sources:quotes.map(q=>q.source),text:'Berikut informasi dari dokumen yang tersedia:\n\n'+quotes.map(q=>(q.demo?'[DATA DEMO]\n':'')+q.quote+'\n(Sumber: '+q.source+(q.page?', hlm. '+q.page:'')+')').join('\n\n')};
  }catch{}
  }
- // Offline passage extraction is exact and must cover every meaningful query term, including gender.
  const required=terms(intent.query);const female=/perempuan|wanita|putri/i.test(question);const male=/laki.laki|pria|putra/i.test(question);
  for(const e of retrieved.evidence){
  const passages=e.text.split(/\n\s*\n|(?<=[.!?])\s+/).filter(s=>s.trim().length>20&&s.length<=1800);
@@ -35,7 +34,7 @@ export class AIService{
  if(passage)return {...base,route:'FALLBACK',sources:[e.source],text:(e.demo?'[DATA DEMO]\n':'')+'Kutipan dokumen:\n\n'+passage.trim()+'\n\nSumber: '+e.source+(e.page?' (hlm. '+e.page+')':'')};
  }
  }
- return {...base,text:'Informasi tersebut belum tersedia dalam basis informasi resmi kami.',route:'ESCALATION',escalate:true};
+ return {...base,text:'Aku belum menemukan informasi resmi yang cukup untuk menjawab pertanyaan itu. Coba tuliskan pertanyaannya lebih spesifik. Jika kasusnya perlu ditangani petugas, ketik *admin* untuk meneruskannya ke panitia.',route:'CLARIFY',escalate:false};
  }
 }
 
