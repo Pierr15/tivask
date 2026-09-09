@@ -24,8 +24,11 @@ enum MessageRole {
 }
 enum TicketStatus {
   OPEN
+  ASSIGNED
   IN_PROGRESS
+  WAITING_USER
   RESOLVED
+  CLOSED
 }
 enum Priority {
   LOW
@@ -164,13 +167,30 @@ model Ticket {
   summary String
   summarySource String @default("LOCAL")
   reason String
+  topic String?
+  assignedTo String?
+  unreadCount Int @default(0)
+  lastUserMessageAt DateTime?
   priority Priority @default(NORMAL)
   status TicketStatus @default(OPEN)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   resolvedAt DateTime?
+  messages TicketMessage[]
   @@index([status, priority, createdAt])
   @@index([conversationId])
+}
+model TicketMessage {
+  id String @id
+  ticketId String
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  role MessageRole
+  content String
+  whatsappMessageId String? @unique
+  replyToMessageId String?
+  delivery String @default("STORED")
+  createdAt DateTime @default(now())
+  @@index([ticketId, createdAt])
 }
 model AnalyticsEvent {
   id String @id
@@ -193,4 +213,3 @@ model DeliveryReceipt {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-

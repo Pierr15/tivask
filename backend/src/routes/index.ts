@@ -37,13 +37,32 @@ router.get('/documents/:id/download',async(req,res)=>{const row=await db(()=>pri
 router.patch('/documents/:id',async(req,res)=>{const v=z.object({verified:z.boolean()}).parse(req.body);reply(res,await db(()=>prisma.document.update({where:{id:id(req.params.id)},data:v})));});
 router.post('/documents/:id/reindex',async(req,res)=>{const key=id(req.params.id);const row=await db(()=>prisma.document.findUnique({where:{id:key}}));if(!row)throw new AppError(404,'Dokumen tidak ditemukan.');documents.enqueue(key);reply(res,{queued:true},202);});
 router.delete('/documents/:id',async(req,res)=>{await documents.remove(id(req.params.id));reply(res,{deleted:true});});
+
 router.get('/tickets',async(req,res)=>{let rows=await persistence.tickets();if(req.query.status)rows=rows.filter(t=>t.status===req.query.status);if(req.query.priority)rows=rows.filter(t=>t.priority===req.query.priority);reply(res,rows);});
-router.get('/tickets/:id',async(req,res)=>{const ticket=await tickets.find(id(req.params.id));reply(res,{ticket,messages:await persistence.history(ticket.conversationId,60)});});
-router.patch('/tickets/:id',async(req,res)=>{const v=z.object({status:z.enum(['OPEN','IN_PROGRESS','RESOLVED']).optional(),priority:z.enum(['LOW','NORMAL','HIGH','URGENT']).optional(),name:z.string().max(100).optional()}).parse(req.body);reply(res,await tickets.update(id(req.params.id),v));});
+router.get('/tickets/:id',async(req,res)=>{
+ const ticket=await tickets.find(id(req.params.id));
+ let messages=await persistence.ticketMessages(ticket.id,100);
+ if(!messages.length){
+ const legacy=await persistence.history(ticket.conversationId,60);
+ messages=legacy.map(m=>({id:m.id,ticketId:ticket.id,role:m.role,content:m.content,whatsappMessageId:null,replyToMessageId:null,delivery:m.delivery,createdAt:m.createdAt}));
+ }
+ reply(res,{ticket,messages});
+});
+router.post('/tickets/:id/read',async(req,res)=>reply(res,await tickets.markRead(id(req.params.id))));
+router.post('/tickets/:id/assign',async(req,res)=>{const ticket=await tickets.find(id(req.params.id));reply(res,await tickets.update(ticket.id,{assignedTo:env.ADMIN_USERNAME,...(ticket.status==='OPEN'?{status:'ASSIGNED' as const}:{})}));});
+router.patch('/tickets/:id',async(req,res)=>{
+ const v=z.object({
+ status:z.enum(['OPEN','ASSIGNED','IN_PROGRESS','WAITING_USER','RESOLVED','CLOSED']).optional(),
+ priority:z.enum(['LOW','NORMAL','HIGH','URGENT']).optional(),
+ name:z.string().max(100).optional(),
+ assignedTo:z.string().trim().min(1).max(100).nullable().optional(),
+ }).parse(req.body);
+ reply(res,await tickets.update(id(req.params.id),v));
+});
 router.post('/tickets/:id/reply',async(req,res)=>{
- const v=z.object({message:z.string().trim().min(1).max(4000),requestId:z.string().uuid()}).parse(req.body);
+ const v=z.object({message:z.string().trim().min(1).max(4000),requestId:z.string().uuid(),replyToMessageId:z.string().min(1).max(100).nullable().optional()}).parse(req.body);
  const t=await tickets.find(id(req.params.id));if(!t.whatsappNumber.startsWith('sim:')&&whatsapp.state.status!=='CONNECTED')throw new AppError(409,'Hubungkan WhatsApp terlebih dahulu.');
- reply(res,await conversations.adminReply(t.id,v.message,v.requestId,(to,text)=>whatsapp.send(to,text)));
+ reply(res,await conversations.adminReply(t.id,v.message,v.requestId,v.replyToMessageId??null,(to,text,quotedId,quoteText)=>whatsapp.send(to,text,quotedId,quoteText)));
 });
 router.get('/analytics',async(req,res)=>reply(res,await analytics.summary(req.query.includeDemo!=='false')));
 router.get('/settings',async(_req,res)=>reply(res,{schoolName:env.SCHOOL_NAME,academicYear:env.ACADEMIC_YEAR,panitiaName:env.PANITIA_NAME,panitiaWa:env.PANITIA_WA,geminiModel:env.GEMINI_MODEL,embeddingModel:env.GEMINI_EMBEDDING_MODEL,historyLimit:env.CONVERSATION_HISTORY_LIMIT,ragTopK:env.RAG_TOP_K,ragMinScore:env.RAG_MIN_SCORE,demoMode:env.DEMO_MODE,adminUsername:env.ADMIN_USERNAME}));
@@ -52,8 +71,11 @@ router.post('/demo/reset',async(req,res)=>{
  if(!env.DEMO_MODE)throw new AppError(403,'Demo mode tidak aktif.');
  z.object({confirmation:z.literal('RESET DEMO')}).parse(req.body);
  await persistence.sync();
+ const simTickets=(await persistence.tickets()).filter(t=>t.whatsappNumber.startsWith('sim:'));
+ const simTicketIds=new Set(simTickets.map(t=>t.id));
  await db(()=>prisma.$transaction([prisma.conversation.deleteMany({where:{channel:'SIMULATOR'}}),prisma.analyticsEvent.deleteMany({where:{demo:true}})]));
  await persistence.journal.update(s=>{const ids=new Set(s.conversations.filter(c=>c.channel==='SIMULATOR').map(c=>c.id));s.conversations=s.conversations.filter(c=>!ids.has(c.id));s.messages=s.messages.filter(m=>!ids.has(m.conversationId));s.events=s.events.filter(e=>!e.demo);});
+ await persistence.ticketMessageStore.update(s=>{s.messages=s.messages.filter(m=>!simTicketIds.has(m.ticketId));});
  await persistence.ticketStore.update(s=>{s.tickets=s.tickets.filter(t=>!t.whatsappNumber.startsWith('sim:'));});
  reply(res,{reset:true});
 });
