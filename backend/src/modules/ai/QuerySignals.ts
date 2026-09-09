@@ -1,6 +1,6 @@
 import { normalize } from './IntentRouter.js';
 
-const stop=new Set('apa apakah berapa bagaimana kapan di ke dari dan atau yang untuk dengan saya kami anda kalau kalo boleh bisa ingin tanya tahu informasi tentang ada itu nya sih ya dong tolong jelaskan mengenai jadi lebih minta masih saat pada ketika berapakah apa saja perempuan laki laki pria wanita putra putri'.split(' '));
+const stop=new Set('apa apakah berapa bagaimana kapan di ke dari dan atau yang untuk dengan saya kami anda kalau kalo boleh bisa ingin tanya tahu informasi tentang ada itu nya sih ya dong tolong jelaskan mengenai jadi lebih minta masih saat pada ketika berapakah apa saja perempuan laki laki pria wanita putra putri smk negeri adiwerna siswa murid calon peserta didik orang tua wali'.split(' '));
 
 // Kata-kata kategori ini membantu routing, tetapi tidak cukup spesifik untuk membuktikan
 // bahwa sebuah evidence menjawab subjek yang sama. Contoh: "biaya" tidak boleh membuat
@@ -56,12 +56,13 @@ export function lexicalScore(query:string,text:string){
  return Math.max(0,Math.min(1,base+genderBonus));
 }
 
-// Dipakai pada tahap grounding. Evidence harus menyebut gender yang diminta dan
-// mayoritas qualifier spesifik (seragam, pendaftaran, afirmasi, TJKT, dst.).
+// Fail closed: setelah context reconstruction, setiap qualifier spesifik wajib muncul.
+// Gender divalidasi terpisah. Jika satu qualifier penting tidak didukung evidence,
+// TIVAsk harus abstain/escalate daripada mengisi celah dengan tebakan model.
 export function supportsQuery(query:string,text:string){
  if(!genderMatches(query,text))return false;
  const specific=specificTerms(query);
  if(!specific.length)return true;
  const haystack=normalize(text);
- return ratio(specific,t=>haystack.includes(t))>=.6;
+ return specific.every(t=>haystack.includes(t));
 }
