@@ -7,7 +7,6 @@ import type { Client, Message } from "whatsapp-web.js";
 import { env, backendRoot, dataPath } from "../../config/env.js";
 import { JsonStore } from "../../core/JsonStore.js";
 import { AppError } from "../../core/errors.js";
-import { logger } from "../../core/logger.js";
 import { splitWhatsApp } from "./WhatsAppFormatter.js";
 import type { ConversationService } from "../conversation/ConversationService.js";
 export function shouldHandle(
@@ -162,7 +161,6 @@ export class WhatsAppProvider {
         console.error("WhatsApp message processing failed:", error);
       });
     });
-    // Initialization resolves after browser startup, while QR/ready events drive actual connection state.
     void client
       .initialize()
       .then(async () => {
@@ -185,8 +183,8 @@ export class WhatsAppProvider {
       message.id?._serialized ??
       message.id?.id ??
       `${message.from ?? "unknown"}:${message.timestamp ?? Date.now()}:${message.body ?? ""}`;
-
-    const id = createHash("sha256").update(String(rawId)).digest("hex");
+    const whatsappMessageId = String(rawId);
+    const id = createHash("sha256").update(whatsappMessageId).digest("hex");
 
     const claimed = await this.receipts.update((s) => {
       if (s[id]) return false;
@@ -202,6 +200,7 @@ export class WhatsAppProvider {
         message.body.trim(),
         "WHATSAPP",
         id,
+        whatsappMessageId,
       );
       await this.send(message.from, response.text);
       await this.conversation.persistence.delivery(response.messageId, "SENT");
@@ -217,13 +216,39 @@ export class WhatsAppProvider {
         .catch(() => {});
     }
   }
-  async send(to: string, text: string) {
+  async send(to: string, text: string, quotedWhatsappMessageId: string | null = null, quoteText: string | null = null) {
     if (this.state.status !== "CONNECTED" || !this.client)
       throw new AppError(409, "WhatsApp belum terhubung.");
     if (!/^\d+@(c\.us|lid)$/.test(to))
       throw new AppError(400, "Tujuan WhatsApp tidak valid.");
-    for (const block of splitWhatsApp(text))
-      await this.client.sendMessage(to, block);
+
+    const serialized=(message:Message)=>message.id?._serialized??message.id?.id??null;
+    const blocks=splitWhatsApp(text);
+    if(!blocks.length)return null;
+
+    if(quotedWhatsappMessageId){
+      try{
+        const first=await this.client.sendMessage(to,blocks[0],{quotedMessageId:quotedWhatsappMessageId});
+        for(const block of blocks.slice(1))await this.client.sendMessage(to,block);
+        return serialized(first);
+      }catch{
+        const context=(quoteText??'pesan sebelumnya').replace(/\s+/g,' ').trim().slice(0,180);
+        const fallback='↩ Menjawab: "'+context+'"\n\n'+text;
+        let firstId:string|null=null;
+        for(const [index,block] of splitWhatsApp(fallback).entries()){
+          const sent=await this.client.sendMessage(to,block);
+          if(index===0)firstId=serialized(sent);
+        }
+        return firstId;
+      }
+    }
+
+    let firstId:string|null=null;
+    for(const [index,block] of blocks.entries()){
+      const sent=await this.client.sendMessage(to,block);
+      if(index===0)firstId=serialized(sent);
+    }
+    return firstId;
   }
   private async destroy() {
     const previous = this.client;
