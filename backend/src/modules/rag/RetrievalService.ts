@@ -23,7 +23,7 @@ export function mergeContextTexts(texts:string[]){
   const max=Math.min(420,merged.length,text.length);let overlap=0;
   for(let n=max;n>=24;n--){if(merged.endsWith(text.slice(0,n))){overlap=n;break;}}
   const remainder=text.slice(overlap).trim();
-  if(remainder)merged+='\n\n'+remainder;
+  if(remainder)merged+=(overlap?' ':'\n\n')+remainder;
  }
  return merged.trim();
 }
