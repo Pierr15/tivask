@@ -20,7 +20,10 @@ export function fuseHybridEvidence(question:string,vectorEvidence:Evidence[],lex
  if(!genderMatches(question,entry.e.text))continue;
  const lexical=Math.max(entry.lexical,lexicalScore(question,entry.e.text));
  const vector=entry.vector;
- let score=vector&&lexical?.55*vector+.4*lexical+.05*Math.min(vector,lexical):vector?.72*vector:lexical;
+ let score:number;
+ if(vector>0&&lexical>0)score=.55*vector+.4*lexical+.05*Math.min(vector,lexical);
+ else if(vector>0)score=.72*vector;
+ else score=lexical;
  // Semantic similarity saja tidak cukup untuk qualifier spesifik seperti seragam,
  // pendaftaran, afirmasi, atau nama jurusan. Evidence yang tidak mendukungnya
  // dipenalti keras dan biasanya jatuh di bawah threshold.
