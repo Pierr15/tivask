@@ -21,23 +21,28 @@ function hardSplit(text:string,size:number){
 }
 
 function semanticUnits(text:string,size:number){
- const paragraphs=text.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
+ const blocks=text.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);
  const units:string[]=[];
- for(const paragraph of paragraphs){
-  if(paragraph.length<=size){units.push(paragraph);continue;}
-  const sentences=paragraph.split(/(?<=[.!?])\s+(?=[\p{L}\p{N}#(\[])/u).map(s=>s.trim()).filter(Boolean);
-  if(sentences.length<=1){units.push(...hardSplit(paragraph,size));continue;}
-  let group='';
-  for(const sentence of sentences){
-   if(sentence.length>size){
-    if(group){units.push(group);group='';}
-    units.push(...hardSplit(sentence,size));
-    continue;
+ for(const block of blocks){
+  // Single newlines often represent table rows, list items, or PDF visual lines.
+  // Treat them as atomic units first so a row is not cut in the middle.
+  const rows=block.includes('\n')?block.split('\n').map(line=>line.trim()).filter(Boolean):[block];
+  for(const row of rows){
+   if(row.length<=size){units.push(row);continue;}
+   const sentences=row.split(/(?<=[.!?])\s+(?=[\p{L}\p{N}#(\[])/u).map(s=>s.trim()).filter(Boolean);
+   if(sentences.length<=1){units.push(...hardSplit(row,size));continue;}
+   let group='';
+   for(const sentence of sentences){
+    if(sentence.length>size){
+     if(group){units.push(group);group='';}
+     units.push(...hardSplit(sentence,size));
+     continue;
+    }
+    const next=group?group+' '+sentence:sentence;
+    if(next.length>size){if(group)units.push(group);group=sentence;}else group=next;
    }
-   const next=group?group+' '+sentence:sentence;
-   if(next.length>size){if(group)units.push(group);group=sentence;}else group=next;
+   if(group)units.push(group);
   }
-  if(group)units.push(group);
  }
  return units;
 }
@@ -47,6 +52,7 @@ function overlapTail(units:string[],overlap:number){
  const tail:string[]=[];let length=0;
  for(let i=units.length-1;i>=0;i--){
   const next=units[i];
+  if(!tail.length&&next.length>overlap)break;
   if(tail.length&&length+next.length+2>overlap)break;
   tail.unshift(next);length+=next.length+(tail.length>1?2:0);
   if(length>=overlap)break;
