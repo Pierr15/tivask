@@ -19,24 +19,29 @@ function decodeHtml(value:string){
  });
 }
 
+function inlineHtmlText(value:string){
+ return decodeHtml(value.replace(/<br\s*\/?\s*>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim());
+}
+
 export function htmlToStructuredText(html:string){
- let text=html
+ // Mammoth mempertahankan tabel sebagai HTML. Ubah setiap <tr> menjadi satu baris
+ // terlebih dahulu agar hubungan antar-cell (mis. gender | nominal) tidak pecah.
+ let text=html.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/gi,(_,row:string)=>{
+  const cells=[...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match=>inlineHtmlText(match[1])).filter(Boolean);
+  return cells.length?'\n'+cells.join(' | ')+'\n':'';
+ });
+ text=text
   .replace(/<h([1-6])[^>]*>/gi,(_,level:string)=>`\n\n${'#'.repeat(Number(level))} `)
   .replace(/<\/h[1-6]>/gi,'\n\n')
   .replace(/<br\s*\/?\s*>/gi,'\n')
   .replace(/<li[^>]*>/gi,'\n- ')
   .replace(/<\/li>/gi,'')
-  .replace(/<tr[^>]*>/gi,'')
-  .replace(/<\/tr>/gi,'\n')
-  .replace(/<\/t[dh]>/gi,' | ')
-  .replace(/<t[dh][^>]*>/gi,'')
   .replace(/<p[^>]*>/gi,'\n\n')
   .replace(/<\/p>/gi,'\n\n')
   .replace(/<[^>]+>/g,'');
  text=decodeHtml(text)
   .replace(/\r\n?/g,'\n')
   .replace(/[ \t]+/g,' ')
-  .replace(/ *\| *(?=\n|$)/g,'')
   .replace(/ *\n */g,'\n')
   .replace(/\n{3,}/g,'\n\n')
   .trim();
