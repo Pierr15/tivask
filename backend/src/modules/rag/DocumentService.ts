@@ -11,6 +11,43 @@ import type { EmbeddingService } from './EmbeddingService.js';
 import type { VectorRepository } from './VectorRepository.js';
 import type { Persistence } from '../conversation/Persistence.js';
 import { logger } from '../../core/logger.js';
+
+function decodeHtml(value:string){
+ return value.replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'").replace(/&#(x?[0-9a-f]+);/gi,(_,code:string)=>{
+  const n=code.toLowerCase().startsWith('x')?Number.parseInt(code.slice(1),16):Number.parseInt(code,10);
+  return Number.isFinite(n)?String.fromCodePoint(n):'';
+ });
+}
+
+function inlineHtmlText(value:string){
+ return decodeHtml(value.replace(/<br\s*\/?\s*>/gi,' ').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim());
+}
+
+export function htmlToStructuredText(html:string){
+ // Mammoth mempertahankan tabel sebagai HTML. Ubah setiap <tr> menjadi satu baris
+ // terlebih dahulu agar hubungan antar-cell (mis. gender | nominal) tidak pecah.
+ let text=html.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/gi,(_,row:string)=>{
+  const cells=[...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi)].map(match=>inlineHtmlText(match[1])).filter(Boolean);
+  return cells.length?'\n'+cells.join(' | ')+'\n':'';
+ });
+ text=text
+  .replace(/<h([1-6])[^>]*>/gi,(_,level:string)=>`\n\n${'#'.repeat(Number(level))} `)
+  .replace(/<\/h[1-6]>/gi,'\n\n')
+  .replace(/<br\s*\/?\s*>/gi,'\n')
+  .replace(/<li[^>]*>/gi,'\n- ')
+  .replace(/<\/li>/gi,'')
+  .replace(/<p[^>]*>/gi,'\n\n')
+  .replace(/<\/p>/gi,'\n\n')
+  .replace(/<[^>]+>/g,'');
+ text=decodeHtml(text)
+  .replace(/\r\n?/g,'\n')
+  .replace(/[ \t]+/g,' ')
+  .replace(/ *\n */g,'\n')
+  .replace(/\n{3,}/g,'\n\n')
+  .trim();
+ return text;
+}
+
 export class DocumentService{
  private running=new Set<string>();private tail:Promise<void>=Promise.resolve();
  constructor(private embedding:EmbeddingService,private vectors:VectorRepository,private persistence:Persistence){}
@@ -31,7 +68,12 @@ export class DocumentService{
  const document=await db(()=>prisma.document.update({where:{id},data:{status:'PROCESSING',error:null,indexedAt:null}}));
  const buffer=await readFile(dataPath('uploads',document.storageName));let pages:TextPage[];
  switch(path.extname(document.filename).toLowerCase()){
- case '.docx':{const result=await mammoth.extractRawText({buffer});pages=[{page:null,text:result.value}];break;}
+ case '.docx':{
+  const result=await mammoth.convertToHtml({buffer});
+  const structured=htmlToStructuredText(result.value);
+  pages=[{page:null,text:structured}];
+  break;
+ }
  case '.pdf':{const parser=new PDFParse({data:new Uint8Array(buffer)});try{const result=await parser.getText();pages=result.pages.map(p=>({page:p.num,text:p.text}));}finally{await parser.destroy();}break;}
  default:{const value:unknown=JSON.parse(buffer.toString('utf8'));pages=[{page:null,text:JSON.stringify(value,null,2)}];}
  }
@@ -56,4 +98,3 @@ export class DocumentService{
  }
  async remove(id:string){if(this.running.has(id))throw new AppError(409,'Tunggu indexing selesai sebelum menghapus.');const d=await db(()=>prisma.document.delete({where:{id}}));await unlink(dataPath('uploads',d.storageName)).catch(()=>{});}
 }
-
